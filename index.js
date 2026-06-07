@@ -65,6 +65,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeCategory = 'performance';
     let activeTab = 'overview';
 
+    // Global PDF report variables
+    let performanceScore = 0;
+    let accessibilityScore = 0;
+    let bestPracticesScore = 0;
+    let seoScore = 0;
+    let overallScore = 0;
+    let analyzedURL = '';
+    let fcpValue = 'N/A';
+    let lcpValue = 'N/A';
+    let ttiValue = 'N/A';
+    let siValue = 'N/A';
+    let tbtValue = 'N/A';
+    let clsValue = 'N/A';
+
     // Optimization tips list for rotation during loading screen
     const optimizationTips = [
         "Compress images before uploading to save bandwidth.",
@@ -425,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const perfScore = Math.round((lighthouse.categories.performance?.score ?? 0) * 100);
         const accScore = Math.round((lighthouse.categories.accessibility?.score ?? 0) * 100);
         const bpScore = Math.round((lighthouse.categories['best-practices']?.score ?? 0) * 100);
-        const seoScore = Math.round((lighthouse.categories.seo?.score ?? 0) * 100);
+        const seoScoreVal = Math.round((lighthouse.categories.seo?.score ?? 0) * 100);
         
         // 2. EXTRACT CORE SPEED AUDITS
         const fcpAudit = lighthouse.audits['first-contentful-paint'];
@@ -447,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const speedScore = Math.round(((fcpScore + lcpScore + ttiScore + siScore) / 4) * 100);
         
         // 4. CALCULATE OVERALL HEALTH SCORE (Average of Performance, Accessibility, Best Practices, SEO)
-        const overallScore = Math.round((perfScore + accScore + bpScore + seoScore) / 4);
+        const overallScoreVal = Math.round((perfScore + accScore + bpScore + seoScoreVal) / 4);
 
         // Store state for modal detailed view
         latestLighthouseResult = lighthouse;
@@ -455,10 +469,24 @@ document.addEventListener('DOMContentLoaded', () => {
             performance: perfScore,
             accessibility: accScore,
             bestpractices: bpScore,
-            seo: seoScore,
+            seo: seoScoreVal,
             speed: speedScore,
-            overall: overallScore
+            overall: overallScoreVal
         };
+
+        // Store global variables for PDF report
+        performanceScore = perfScore;
+        accessibilityScore = accScore;
+        bestPracticesScore = bpScore;
+        seoScore = seoScoreVal;
+        overallScore = overallScoreVal;
+        analyzedURL = url;
+        fcpValue = lighthouse.audits['first-contentful-paint']?.displayValue || 'N/A';
+        lcpValue = lighthouse.audits['largest-contentful-paint']?.displayValue || 'N/A';
+        ttiValue = lighthouse.audits['interactive']?.displayValue || 'N/A';
+        siValue = lighthouse.audits['speed-index']?.displayValue || 'N/A';
+        tbtValue = lighthouse.audits['total-blocking-time']?.displayValue || 'N/A';
+        clsValue = lighthouse.audits['cumulative-layout-shift']?.displayValue || 'N/A';
 
         // Update score card badges
         updateScoreCardBadges(lighthouse);
@@ -475,15 +503,15 @@ document.addEventListener('DOMContentLoaded', () => {
         updateScoreGauge(gaugePerf, scorePerf, perfScore);
         updateScoreGauge(gaugeAcc, scoreAcc, accScore);
         updateScoreGauge(gaugeBP, scoreBP, bpScore);
-        updateScoreGauge(gaugeSeo, scoreSeo, seoScore);
-        updateScoreGauge(gaugeOverall, scoreOverall, overallScore);
+        updateScoreGauge(gaugeSeo, scoreSeo, seoScoreVal);
+        updateScoreGauge(gaugeOverall, scoreOverall, overallScoreVal);
         
         // Add ratings classes to gauge score cards
         classifyScoreCard(scorePerf.closest('.score-card'), perfScore);
         classifyScoreCard(scoreAcc.closest('.score-card'), accScore);
         classifyScoreCard(scoreBP.closest('.score-card'), bpScore);
-        classifyScoreCard(scoreSeo.closest('.score-card'), seoScore);
-        classifyScoreCard(scoreOverall.closest('.score-card'), overallScore);
+        classifyScoreCard(scoreSeo.closest('.score-card'), seoScoreVal);
+        classifyScoreCard(scoreOverall.closest('.score-card'), overallScoreVal);
 
         // 6. UPDATE CORE WEB VITALS CARDS
         updateMetricCard(cardFcp, valFcp, badgeFcp, fcpVal, fcpScore);
@@ -495,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
         buildRecommendations(lighthouse.audits);
 
         // 8. RUN ADVANCED TAB CONTENT GENERATORS
-        saveToHistory(url, overallScore);
+        saveToHistory(url, overallScoreVal);
         runUptimeChecker(url);
         runMetaTagsPreview(lighthouse);
         runLinksAnalysis(lighthouse);
@@ -1760,60 +1788,265 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 2. Download PDF Report (Programmatic jsPDF formatted report)
+    // 2. Download PDF Report (Programmatic jsPDF formatted report — Professional 2-page)
     async function downloadPDF() {
-        const analyzedURL = currentUrl;
-        const performanceScore = computedScores.performance || 0;
-        const accessibilityScore = computedScores.accessibility || 0;
-        const bestPracticesScore = computedScores.bestpractices || 0;
-        const seoScore = computedScores.seo || 0;
-        const overallScore = computedScores.overall || 0;
-
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
-        
+        const W = 210;
+        const margin = 15;
+        let y = 0;
+
+        // ===== PAGE 1 =====
+
+        // Header bar
         pdf.setFillColor(13, 11, 20);
-        pdf.rect(0, 0, 210, 297, 'F');
-        
-        pdf.setTextColor(201, 168, 76);
+        pdf.rect(0, 0, W, 297, 'F');
+
+        // Gold top bar
+        pdf.setFillColor(201, 168, 76);
+        pdf.rect(0, 0, W, 3, 'F');
+
+        // Logo
+        pdf.setTextColor(240, 234, 255);
         pdf.setFontSize(22);
         pdf.setFont('helvetica', 'bold');
-        pdf.text('WebCheck Pro', 15, 20);
-        
-        pdf.setTextColor(240, 234, 255);
-        pdf.setFontSize(12);
-        pdf.text('Website Analysis Report', 15, 30);
-        
-        pdf.setTextColor(155, 143, 192);
-        pdf.setFontSize(9);
-        pdf.text('Website: ' + analyzedURL, 15, 40);
-        pdf.text('Date: ' + new Date().toLocaleDateString(), 15, 48);
-        
+        pdf.text('WebCheck', margin, 20);
         pdf.setTextColor(201, 168, 76);
-        pdf.setFontSize(14);
-        pdf.text('SCORES:', 15, 62);
-        
-        let y = 74;
+        pdf.text('Pro', margin + 47, 20);
+
+        // Report title
+        pdf.setTextColor(155, 143, 192);
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('WEBSITE ANALYSIS REPORT', margin, 28);
+
+        // Date & URL box
+        pdf.setFillColor(26, 20, 38);
+        pdf.roundedRect(margin, 33, W - 30, 22, 3, 3, 'F');
+        pdf.setTextColor(201, 168, 76);
+        pdf.setFontSize(9);
+        pdf.text('Website:', margin + 4, 41);
+        pdf.setTextColor(240, 234, 255);
+        pdf.text(analyzedURL, margin + 22, 41);
+        pdf.setTextColor(201, 168, 76);
+        pdf.text('Date:', margin + 4, 50);
+        pdf.setTextColor(240, 234, 255);
+        pdf.text(new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}), margin + 18, 50);
+        pdf.setTextColor(201, 168, 76);
+        pdf.text('Strategy:', margin + 100, 50);
+        pdf.setTextColor(240, 234, 255);
+        pdf.text(currentStrategy || 'Desktop', margin + 118, 50);
+
+        // ===== SCORES SECTION =====
+        y = 68;
+        pdf.setTextColor(201, 168, 76);
+        pdf.setFontSize(13);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('PERFORMANCE SCORES', margin, y);
+        pdf.setFillColor(201, 168, 76);
+        pdf.rect(margin, y + 2, W - 30, 0.5, 'F');
+
+        y += 12;
         const scores = [
-            ['Performance', performanceScore],
-            ['Accessibility', accessibilityScore],
-            ['Best Practices', bestPracticesScore],
-            ['SEO', seoScore],
-            ['Overall', overallScore]
+            { name: 'Performance', score: Math.round(performanceScore), desc: 'Overall speed and loading efficiency' },
+            { name: 'Accessibility', score: Math.round(accessibilityScore), desc: 'How accessible the site is for all users' },
+            { name: 'Best Practices', score: Math.round(bestPracticesScore), desc: 'Security and web development standards' },
+            { name: 'SEO', score: Math.round(seoScore), desc: 'Search engine optimization visibility' },
+            { name: 'Overall Health', score: Math.round(overallScore), desc: 'Unified standard health rating' }
         ];
-        scores.forEach(([name, score]) => {
-            const s = Math.round(score);
-            const color = s >= 90 ? [34,197,94] : s >= 50 ? [201,168,76] : [239,68,68];
+
+        scores.forEach(item => {
+            const color = item.score >= 90 ? [34,197,94] : item.score >= 50 ? [201,168,76] : [239,68,68];
+
+            pdf.setFillColor(26, 20, 38);
+            pdf.roundedRect(margin, y, W - 30, 16, 2, 2, 'F');
+
+            // Score circle
+            pdf.setFillColor(...color);
+            pdf.circle(margin + 8, y + 8, 6, 'F');
+            pdf.setTextColor(13, 11, 20);
+            pdf.setFontSize(7);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(String(item.score), margin + 5.5, y + 10);
+
+            // Name & desc
+            pdf.setTextColor(240, 234, 255);
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(item.name, margin + 18, y + 7);
+            pdf.setTextColor(155, 143, 192);
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(item.desc, margin + 18, y + 13);
+
+            // Score bar
+            const barX = margin + 120;
+            const barW = 60;
+            pdf.setFillColor(45, 32, 64);
+            pdf.roundedRect(barX, y + 6, barW, 4, 2, 2, 'F');
+            pdf.setFillColor(...color);
+            pdf.roundedRect(barX, y + 6, barW * (item.score / 100), 4, 2, 2, 'F');
+
+            // Score label
             pdf.setTextColor(...color);
-            pdf.setFontSize(11);
-            pdf.text(name + ': ' + s + '/100', 15, y);
-            y += 10;
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'bold');
+            const grade = item.score >= 90 ? 'GOOD' : item.score >= 50 ? 'AVERAGE' : 'POOR';
+            pdf.text(grade, barX + barW + 3, y + 10);
+
+            y += 20;
         });
-        
-        pdf.setTextColor(100, 100, 100);
-        pdf.setFontSize(8);
-        pdf.text('Generated by WebCheck Pro | Built by Farhan Ali | twine.net/FarhanAli05', 15, 285);
-        
+
+        // ===== CORE WEB VITALS =====
+        y += 5;
+        pdf.setTextColor(201, 168, 76);
+        pdf.setFontSize(13);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('CORE WEB VITALS', margin, y);
+        pdf.setFillColor(201, 168, 76);
+        pdf.rect(margin, y + 2, W - 30, 0.5, 'F');
+        y += 12;
+
+        const vitals = [
+            { name: 'First Contentful Paint (FCP)', value: fcpValue || 'N/A', good: '< 1.8s' },
+            { name: 'Largest Contentful Paint (LCP)', value: lcpValue || 'N/A', good: '< 2.5s' },
+            { name: 'Time to Interactive (TTI)', value: ttiValue || 'N/A', good: '< 3.8s' },
+            { name: 'Speed Index', value: siValue || 'N/A', good: '< 3.4s' },
+            { name: 'Total Blocking Time (TBT)', value: tbtValue || 'N/A', good: '< 200ms' },
+            { name: 'Cumulative Layout Shift (CLS)', value: clsValue || 'N/A', good: '< 0.1' },
+        ];
+
+        vitals.forEach((v, idx) => {
+            const colOffset = (idx % 2 === 0) ? 0 : 90;
+
+            pdf.setFillColor(26, 20, 38);
+            pdf.roundedRect(margin + colOffset, y, 85, 14, 2, 2, 'F');
+            pdf.setTextColor(155, 143, 192);
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(v.name, margin + colOffset + 3, y + 6);
+            pdf.setTextColor(240, 234, 255);
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(v.value, margin + colOffset + 3, y + 12);
+            pdf.setTextColor(92, 80, 117);
+            pdf.setFontSize(7);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('Good: ' + v.good, margin + colOffset + 50, y + 12);
+
+            if (idx % 2 === 1) {
+                y += 18;
+            }
+        });
+
+        // ===== PAGE 2 =====
+        pdf.addPage();
+        pdf.setFillColor(13, 11, 20);
+        pdf.rect(0, 0, W, 297, 'F');
+        pdf.setFillColor(201, 168, 76);
+        pdf.rect(0, 0, W, 3, 'F');
+
+        y = 20;
+
+        // SEO Issues
+        pdf.setTextColor(201, 168, 76);
+        pdf.setFontSize(13);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('SEO ANALYSIS', margin, y);
+        pdf.setFillColor(201, 168, 76);
+        pdf.rect(margin, y + 2, W - 30, 0.5, 'F');
+        y += 12;
+
+        const seoCheckIds = [
+            { name: 'Meta Title', auditId: 'document-title' },
+            { name: 'Meta Description', auditId: 'meta-description' },
+            { name: 'Image Alt Text', auditId: 'image-alt' },
+            { name: 'Crawlable Links', auditId: 'crawlable-anchors' },
+            { name: 'Mobile Friendly', auditId: 'font-size' },
+            { name: 'Robots.txt', auditId: 'robots-txt' },
+            { name: 'Canonical URL', auditId: 'canonical' },
+            { name: 'Structured Data', auditId: 'structured-data' },
+        ];
+
+        const seoChecks = seoCheckIds.map(check => {
+            let status = 'pass';
+            if (latestLighthouseResult && latestLighthouseResult.audits[check.auditId]) {
+                const audit = latestLighthouseResult.audits[check.auditId];
+                status = (audit.score !== null && audit.score >= 0.9) ? 'pass' : 'fail';
+            }
+            return { name: check.name, status: status };
+        });
+
+        seoChecks.forEach((check, i) => {
+            const isPass = check.status === 'pass';
+            const color = isPass ? [34,197,94] : [239,68,68];
+            const icon = isPass ? 'PASS' : 'FAIL';
+            const colOffset = (i % 2 === 0) ? 0 : 90;
+
+            pdf.setFillColor(26, 20, 38);
+            pdf.roundedRect(margin + colOffset, y, 85, 12, 2, 2, 'F');
+            pdf.setTextColor(...color);
+            pdf.setFontSize(7);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(icon, margin + colOffset + 3, y + 8);
+            pdf.setTextColor(240, 234, 255);
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(check.name, margin + colOffset + 15, y + 8);
+
+            if (i % 2 === 1) {
+                y += 16;
+            }
+        });
+
+        // Speed Issues
+        y += 10;
+        pdf.setTextColor(201, 168, 76);
+        pdf.setFontSize(13);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('SPEED ISSUES & RECOMMENDATIONS', margin, y);
+        pdf.setFillColor(201, 168, 76);
+        pdf.rect(margin, y + 2, W - 30, 0.5, 'F');
+        y += 12;
+
+        const speedIssuesList = [
+            'Minify CSS and JavaScript files to reduce file sizes',
+            'Enable GZIP/Brotli compression on server',
+            'Optimize and compress all images (use WebP format)',
+            'Enable browser caching for static resources',
+            'Remove unused CSS and JavaScript code',
+            'Reduce render-blocking resources in page head',
+            'Use a Content Delivery Network (CDN)',
+            'Minimize server response time (TTFB < 200ms)',
+        ];
+
+        speedIssuesList.forEach(issue => {
+            pdf.setFillColor(26, 20, 38);
+            pdf.roundedRect(margin, y, W - 30, 10, 2, 2, 'F');
+            pdf.setTextColor(201, 168, 76);
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('->', margin + 3, y + 7);
+            pdf.setTextColor(155, 143, 192);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(issue, margin + 9, y + 7);
+            y += 13;
+        });
+
+        // Footer both pages
+        [1, 2].forEach(pageNum => {
+            pdf.setPage(pageNum);
+            pdf.setFillColor(26, 20, 38);
+            pdf.rect(0, 285, W, 12, 'F');
+            pdf.setTextColor(92, 80, 117);
+            pdf.setFontSize(7);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('Generated by WebCheck Pro  |  Built by Farhan Ali  |  twine.net/FarhanAli05', margin, 292);
+            pdf.setTextColor(201, 168, 76);
+            pdf.text('Page ' + pageNum + ' of 2', W - 25, 292);
+        });
+
+        // Save
         const domain = new URL(analyzedURL).hostname;
         const date = new Date().toISOString().split('T')[0];
         pdf.save('WebCheck-' + domain + '-' + date + '.pdf');
